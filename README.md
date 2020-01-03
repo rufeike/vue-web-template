@@ -1,5 +1,12 @@
 # vue web项目基本框架结构模板
->框架基于node(v12.11.1)，npm(^6.9.0)，@vue/cli@4.1.2，开发环境window
+>框架基于node(v12.11.1)，npm(^6.9.0)，@vue/cli@4.1.2，开发环境window，使用vue-cli安装后，根据项目的具体情况，对目录结构进行部分调整
+
+调整如下：
+- 在src目录下增加api目录，用于保持服务（接口）调用文件
+- 在src/assets目录，增加图片，样式等文件目录，存放各种静态文件
+- 在src/components组件目录中，增加global目录，用于存放项目公共的组件
+- 在src目录下增加utils目录，用于存放功能性文件
+
 
 ## 安装@vue/cli脚手架
 ```shell
@@ -71,7 +78,7 @@ $ ? Save this as a preset for future projects? (y/N) n #将其保存为将来项
 │   │  ├─global         公共组件目录 
 │   │  └─...
 │   ├─router            路由文件目录
-│   ├─store             仓库文件目录
+│   ├─store             vuex配置文件目录
 │   ├─utils             功能性工具目录 
 │   │  ├─request.js     请求初始工具 
 │   │  └─...
@@ -94,10 +101,119 @@ $ ? Save this as a preset for future projects? (y/N) n #将其保存为将来项
 └─...
 ```
 
+### router 路由文件
+
+#### 路由自动加载实现
+```js
+import Vue from 'vue'
+import VueRouter from 'vue-router'
+import NProgress from 'nprogress'
+import Home from '../views/Home.vue'
+
+Vue.use(VueRouter)
+
+let routes = []
+
+// 动态加载路由，遍历router文件夹中的所有js文件
+const requireContext = require.context(
+  './', // 查找文件夹的路径
+  true, // 是否递归子目录
+  /\.js$/ // 查找.js文件正则
+)
+
+requireContext.keys().forEach(filename => {
+  if (filename === './index.js') return
+  const routerModule = requireContext(filename)
+  routes = [...routes, ...(routerModule.default || routerModule)]
+})
+
+const router = new VueRouter({
+  routes
+})
+
+// 动态增加路由
+router.addRoutes([
+  {
+    path: '/',
+    name: 'home',
+    component: Home
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: () => import(/* webpackChunkName: "about" */ '../views/About.vue')
+  }
+])
+
+// 导航守卫
+router.beforeEach((to, from, next) => {
+  NProgress.start()
+  next()
+})
+
+router.afterEach((to, from) => {
+  NProgress.done()
+})
+
+export default router
+```
+
+### .env相关配置文件
+>可以在项目中设置，api接口地址，常用参数等，注意配置参数需要使用`VUE_APP_`开头
+
+配置如下：
+```.env
+VUE_APP_HTTP_HOST = http://jsonplaceholder.typicode.com
+VUE_APP_PORT = 8080
+```
+
+### router.js中增加导航守卫和进度条
+>可以增加用户体验，在导航切换时有进度条等待效果
+```js
+import Vue from 'vue'
+import VueRouter from 'vue-router'
+import NProgress from 'nprogress'
+import Home from '../views/Home.vue'
+
+Vue.use(VueRouter)
+
+const routes = [
+  {
+    path: '/',
+    name: 'home',
+    component: Home
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: () => import(/* webpackChunkName: "about" */ '../views/About.vue')
+  }
+]
+
+const router = new VueRouter({
+  routes
+})
+
+// 导航守卫
+router.beforeEach((to, from, next) => {
+  NProgress.start()
+  next()
+})
+
+router.afterEach((to, from) => {
+  NProgress.done()
+})
+
+export default router
+
+```
 
 ## 相关开发辅助插件
+### `element-ui`使用
+参考文档：[Element组件文档](https://element.eleme.cn/#/zh-CN/component/installation)
+
 ### 浏览器渲染效果兼容处理 normalize.css
->需要在main.js中进行引入配置
+>可以不同浏览器渲染效果不一致问题，需要在main.js中进行引入配置
 - 安装
 ```shell
 $ npm install normalize.css -D
@@ -108,6 +224,16 @@ import 'normalize.css/normalize.css'
 ```
 
 ### 异步交互数据插件 axios
+参考文档：[axios中文文档](http://www.axios-js.com/zh-cn/docs/)
+
+接口测试：[在线REST API](http://jsonplaceholder.typicode.com/)
+
+>使用axios实现ajax的请求，通过配置拦截器实现通用配置的添加
+- 从环境变量中获取接口请求的地址（`.env.developent`，`.env.production`）
+- 在utils文件下新建文件`request.js，实现axios的实例化和拦截器方法，并导出实例
+- 请求拦截中，对用户的授权token进行统一添加
+- 响应拦截器，对响应的信息进行统一前置处理，使用`element-ui`的`Message`组件实现信息提醒
+
 - 安装
 ```shell
 $ npm install axios -D
@@ -116,15 +242,87 @@ $ npm install axios -D
 ```js
 import axios from 'axios'
 ```
+- 拦截器的使用
+```js
+import axios from 'axios'
+import store from '@/store'
+import NProgress from 'nprogress'
+
+//导航条
+NProgress.configure({
+  showSpintion: false
+})
+
+const request = axios.create({
+  baseURL: process.env.VUE_APP_HTTP_HOST,//api域名地址
+  timeout: 12000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'applicattion/json'
+  }
+})
+
+// 请求拦截器
+request.interceptors.request.use(
+  config => {
+    config.headers['token'] = store.state.token
+    NProgress.start()
+    return config
+  },
+  error => {
+    return Promise.reject(error)
+  }
+)
+
+// 响应拦截器
+request.interceptors.response.use(
+  response => {
+    NProgress.done()
+    return response
+  },
+  error => {
+    NProgress.done()
+    return Promise.rejectt(error)
+  }
+)
+
+```
+
+
+
 ### 进度条插件 nprogress
+参考文档  [官网文档](http://ricostacruz.com/nprogress/)
+
+>NProgerss可以为路由跳转和ajax请求加载过程中提供友好的进度条效果
+>- 路由切换 可以在全局导航守卫中添加
+>- ajax请求 可以在请求拦截器和响应拦截器中添加方法
+
+
 - 安装
 ```shell
 $ npm install nprogress -D
 ```
-- 引入
+- 引入css
 ```js
 import 'nprogress/nprogress.css
 ```
+- 基本使用
+```js
+import NProgress from 'nprogress'
+
+//初始化
+NProgress.configure({
+  showSpintion: false
+})
+
+//开启
+NProgress.start()
+
+//关闭
+NProgress.done()
+
+```
+
 
 
 
