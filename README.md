@@ -98,7 +98,63 @@ $ ? Save this as a preset for future projects? (y/N) n #将其保存为将来项
 ├─babel.config.js       babel配置文件
 ├─package.json          npm配置文件 
 ├─README.md             框架使用说明文档 
+├─vue.config.js         vue配置文件 
 └─...
+```
+
+### components 组件文件夹
+
+#### 公共组件注册和引入
+>把系统中通用部分放置再`@/components/global`文件夹中，如顶部导航，底部信息等
+- 需要再components中增加一个`index.js`用于调用和遍历global文件夹中的组件
+```js
+import Vue from 'vue'
+
+const requireContext = require.context(
+  './global', // 遍历global文件夹
+  true,
+  /\.vue$/
+)
+requireContext.keys().forEach(filename => {
+  const componentConfig = requireContext(filename)
+  Vue.component(
+    componentConfig.default.name || componentConfig.name, // 获取组件的名称
+    componentConfig.default || componentConfig // 获取组件内容
+  )
+})
+
+```
+
+- 再程序入口`main.js`中引入该文件
+```js
+import './components' // 引入公共组件
+```
+
+- 其他组件中调用
+如：再global中增加一个`footer.vue`组件
+```html
+<template>
+  <div>
+    <h1>Footer TEST</h1>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'FooterTest'
+}
+</script>
+
+<style>
+
+</style>
+
+```
+调用
+```html
+<footer-test></footer-test>
+<!-- 或 -->
+<FooterTest/>
 ```
 
 ### router 路由文件
@@ -207,6 +263,30 @@ router.afterEach((to, from) => {
 export default router
 
 ```
+
+## vue配置文件`vue.config.js`
+>可以参考vue官方文档和vue中的`E:\vue-web-template\node_modules\@vue\cli-service\lib\config\base.js`配置文件
+```js
+const path = require('path')
+
+module.exports = {
+  css: { // 配置全局样式
+    loaderOptions: {
+      sass: {
+        data: `@impport "~element-ui/packages/theme-chalk/src/index";`
+      }
+    }
+  },
+  chainWebpack: config => { // 配置路径别名
+    config.resolve.alias
+      .set('api', path.resolve(__dirname, './src/api'))
+      .set('utils', path.resolve(__dirname, './src/utils'))
+  }
+}
+
+```
+
+
 
 ## 相关开发辅助插件
 ### `element-ui`使用

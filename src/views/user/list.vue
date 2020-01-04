@@ -1,6 +1,8 @@
 <template>
   <div>
-      <h1>{{ $router.meta.title || 'User list'}}</h1>
+      <h1>{{ $route.meta.title || 'User list'}}</h1>
+      <footer-test></footer-test>
+      <FooterTest/>
   </div>
 </template>
 

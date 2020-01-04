@@ -1,15 +1,12 @@
 <template>
-  <div id="app">
-    <div id="nav">
-      User Module
-    </div>
-    <router-view/>
+  <div>
+    <h1>Footer TEST</h1>
   </div>
 </template>
 
 <script>
 export default {
-
+  name: 'FooterTest'
 }
 </script>
 
